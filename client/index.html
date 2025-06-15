@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Verplant - Subway Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-radius: 5px;
+        }
+        
+        .controls input, .controls select, .controls button {
+            margin: 5px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .controls button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .controls button:hover {
+            background-color: #45a049;
+        }
+        
+        .controls button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #game-canvas {
+            border: 2px solid #333;
+            background-color: #fafafa;
+            border-radius: 5px;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .game-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        
+        .instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .line-buttons {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .line-button {
+            margin: 5px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .line-button.red { background-color: #FF0000; }
+        .line-button.blue { background-color: #0000FF; }
+        .line-button.green { background-color: #008000; }
+        .line-button.yellow { background-color: #FFD700; color: black; }
+        
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🚇 Verplant - Subway Game</h1>
+        
+        <div id="connection-status" class="status disconnected">
+            Not connected to server
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="player-name" placeholder="Enter your name" value="Player1">
+            <select id="city-select">
+                <option value="amsterdam">Amsterdam</option>
+                <option value="berlin">Berlin</option>
+                <option value="paris">Paris</option>
+                <option value="madrid">Madrid</option>
+            </select>
+            <button id="connect-btn" onclick="connectToGame()">Connect</button>
+            <button id="join-btn" onclick="joinGame()" disabled>Join Game</button>
+            <button id="start-btn" onclick="startGame()" disabled>Start Game</button>
+        </div>
+        
+        <div class="line-buttons">
+            <button class="line-button red" onclick="chooseLine('red', 0)">Choose Red Line</button>
+            <button class="line-button blue" onclick="chooseLine('blue', 0)">Choose Blue Line</button>
+        </div>
+        
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+        
+        <div class="game-info">
+            <div id="current-card">Current Card: None</div>
+            <div id="player-info">Player Info: Not connected</div>
+            <div id="game-status">Game Status: Waiting</div>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Play:</h3>
+            <ul>
+                <li>1. Enter your name and select a city</li>
+                <li>2. Click "Connect" to connect to the server</li>
+                <li>3. Click "Join Game" to join a game session</li>
+                <li>4. Click "Start Game" to begin playing</li>
+                <li>5. When a card is revealed, choose a subway line to mark stations</li>
+                <li>6. Complete subway lines to earn points</li>
+                <li>7. The game ends when all train car windows are filled</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { GameClient } from './pkg/verplant_client.js';
+        
+        let gameClient = null;
+        
+        async function run() {
+            await init();
+            console.log("WASM module loaded");
+        }
+        
+        window.connectToGame = async function() {
+            try {
+                if (!gameClient) {
+                    gameClient = new GameClient();
+                }
+                await gameClient.connect_to_server();
+                
+                document.getElementById('connection-status').textContent = 'Connected to server';
+                document.getElementById('connection-status').className = 'status connected';
+                document.getElementById('connect-btn').disabled = true;
+                document.getElementById('join-btn').disabled = false;
+                
+            } catch (error) {
+                console.error('Connection failed:', error);
+                document.getElementById('connection-status').textContent = 'Connection failed: ' + error;
+                document.getElementById('connection-status').className = 'status disconnected';
+            }
+        };
+        
+        window.joinGame = function() {
+            if (gameClient) {
+                gameClient.join_game();
+                document.getElementById('join-btn').disabled = true;
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('player-info').textContent = 'Joined game, waiting for others...';
+            }
+        };
+        
+        window.startGame = function() {
+            if (gameClient) {
+                gameClient.start_game();
+                document.getElementById('start-btn').disabled = true;
+                document.getElementById('game-status').textContent = 'Game started!';
+            }
+        };
+        
+        window.chooseLine = function(lineId, windowIndex) {
+            if (gameClient) {
+                gameClient.choose_line(lineId, windowIndex);
+            }
+        };
+        
+        window.markTransferStation = function(stationId) {
+            if (gameClient) {
+                gameClient.mark_transfer_station(stationId);
+            }
+        };
+        
+        // Start the application
+        run();
+    </script>
+</body>
+</html>
